@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Faculty Finder Lite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F2EFE4;
+    --surface: #FFFFFF;
+    --surface-2: #E8E2CF;
+    --text: #16263D;
+    --text-dim: #5B6B80;
+    --accent: #9C6F0E;
+    --accent-2: #3F6B46;
+    --border: rgba(22,38,61,0.14);
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #0F1B2D;
+      --surface: #16263D;
+      --surface-2: #1E3350;
+      --text: #EDE8DC;
+      --text-dim: #A9B4C4;
+      --accent: #D9B23C;
+      --accent-2: #7FAE86;
+      --border: rgba(237,232,220,0.16);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0F1B2D;
+    --surface: #16263D;
+    --surface-2: #1E3350;
+    --text: #EDE8DC;
+    --text-dim: #A9B4C4;
+    --accent: #D9B23C;
+    --accent-2: #7FAE86;
+    --border: rgba(237,232,220,0.16);
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); height: 100%; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  }
+  .wrap { max-width: 480px; margin: 0 auto; padding: 28px 20px 48px; }
+  .eyebrow { font-size: 13px; color: var(--accent); font-weight: 600; letter-spacing: 0.02em; }
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-size: 30px;
+    font-weight: 600;
+    line-height: 1.15;
+    margin: 6px 0 8px;
+  }
+  .sub { color: var(--text-dim); font-size: 14.5px; line-height: 1.5; margin: 0 0 22px; max-width: 42ch; }
+  .actions { display: flex; flex-direction: column; gap: 10px; margin-bottom: 26px; }
+  button {
+    font: inherit;
+    font-weight: 600;
+    font-size: 15px;
+    padding: 13px 18px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    text-align: left;
+  }
+  button.primary { background: var(--accent); color: var(--bg); border-color: transparent; }
+  button:active { transform: scale(0.99); }
+  .status { font-size: 13.5px; color: var(--text-dim); min-height: 18px; margin-bottom: 18px; }
+  .status.err { color: #B8513B; }
+  .list { display: flex; flex-direction: column; gap: 10px; }
+  .map { width: 100%; height: auto; display: none; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 16px; }
+  .map.on { display: block; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .card.nearest { border-color: var(--accent-2); background: var(--surface-2); }
+  .arrow {
+    flex: none;
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    color: var(--accent-2);
+  }
+  .card.nearest .arrow { color: var(--accent); }
+  .meta { flex: 1; min-width: 0; }
+  .name { font-weight: 600; font-size: 15px; margin: 0 0 2px; }
+  .dist { font-size: 13px; color: var(--text-dim); }
+  .tag {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    padding: 3px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .note { margin-top: 24px; font-size: 12.5px; color: var(--text-dim); line-height: 1.5; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Faculty Finder — v1 (real campus data)</div>
+  <h1>Where am I relative to campus?</h1>
+  <p class="sub">Tap a button to calculate distance and direction to the nearest campus locations from a given point. This is the core math the AR version will run on — coordinates below are real surveyed data for 20 OAU landmarks.</p>
+
+  <div class="actions">
+    <button class="primary" id="use-location">Use my real GPS location</button>
+    <button id="simulate">Simulate a test point near Faculty of Technology</button>
+  </div>
+
+  <div class="status" id="status">No location checked yet.</div>
+  <svg id="map" class="map" viewBox="0 0 400 300" role="img" aria-label="Plan view of campus locations"></svg>
+  <div class="list" id="list"></div>
+
+  <p class="note">Distance uses the haversine formula; direction uses true-north bearing rounded to 8 compass points. Data below is real surveyed OAU campus coordinates — add more the same way as you get them.</p>
+</div>
+
+<script>
+  const faculties = [
+    { name: "Faculty of Technology", category: "Faculty", lat: 7.51786, lng: 4.52831 },
+    { name: "Student Union", category: "Student Services", lat: 7.517954, lng: 4.520764 },
+    { name: "First Bank", category: "Bank", lat: 7.521584, lng: 4.523843 },
+    { name: "Faculty of Agriculture", category: "Faculty", lat: 7.522503, lng: 4.525837 },
+    { name: "Faculty of Environmental Design and Management", category: "Faculty", lat: 7.524602, lng: 4.527134 },
+    { name: "New Geology", category: "Academic Building", lat: 7.520734, lng: 4.520195 },
+    { name: "Museum", category: "Museum", lat: 7.516756, lng: 4.528173 },
+    { name: "Ajose", category: "Campus Landmark", lat: 7.521812, lng: 4.526732 },
+    { name: "Spider Building", category: "Campus Landmark", lat: 7.523554, lng: 4.529412 },
+    { name: "Maintenance", category: "Campus Facility", lat: 7.522040, lng: 4.528237 },
+    { name: "Humanities", category: "Academic Area", lat: 7.519955, lng: 4.524689 },
+    { name: "BOOA and BOOC", category: "Academic Buildings", lat: 7.518736, lng: 4.524977 },
+    { name: "Botany", category: "Department or Building", lat: 7.519485, lng: 4.526105 },
+    { name: "Central Laboratory", category: "Laboratory", lat: 7.518204, lng: 4.524019 },
+    { name: "Anatomy", category: "Department or Building", lat: 7.519004, lng: 4.526395 },
+    { name: "Computer Building", category: "Academic Building", lat: 7.518055, lng: 4.529530 },
+    { name: "INTECU Building", category: "Campus Facility", lat: 7.517402, lng: 4.528500 },
+    { name: "Yellow House", category: "Campus Landmark", lat: 7.519279, lng: 4.519986 },
+    { name: "White House Extension", category: "Campus Landmark", lat: 7.520119, lng: 4.520072 },
+    { name: "Faculty of Administration", category: "Faculty", lat: 7.520031, lng: 4.522010 },
+  ];
+
+  const toRad = d => d * Math.PI / 180;
+
+  function haversine(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat/2)**2 +
+              Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  function bearing(lat1, lon1, lat2, lon2) {
+    const y = Math.sin(toRad(lon2-lon1)) * Math.cos(toRad(lat2));
+    const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+              Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(toRad(lon2-lon1));
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+  }
+
+  function compass(deg) {
+    const dirs = ["N","NE","E","SE","S","SW","W","NW"];
+    return dirs[Math.round(deg / 45) % 8];
+  }
+
+  function fmtDistance(m) {
+    return m < 1000 ? Math.round(m) + " m" : (m/1000).toFixed(2) + " km";
+  }
+
+  function drawMap(uLat, uLng, results) {
+    const svg = document.getElementById('map');
+    const W = 400, H = 300, P = 28;
+    const lats = results.map(r => r.lat).concat(uLat);
+    const lngs = results.map(r => r.lng).concat(uLng);
+    const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+    const span = Math.max(maxLat - minLat, maxLng - minLng) || 0.001;
+    const s = Math.min(W - 2*P, H - 2*P) / span;
+    const ox = (W - (maxLng - minLng) * s) / 2, oy = (H - (maxLat - minLat) * s) / 2;
+    const X = lng => ox + (lng - minLng) * s;
+    const Y = lat => H - (oy + (lat - minLat) * s);
+    let out = '';
+    results.forEach((r, i) => {
+      const near = i < 3;
+      const x = X(r.lng), y = Y(r.lat);
+      out += `<circle cx="${x}" cy="${y}" r="${near ? 5 : 3.5}" style="fill:${near ? 'var(--accent)' : 'var(--text-dim)'}"/>`;
+      if (near) {
+        const flip = x > W - 140;
+        out += `<text x="${flip ? x - 8 : x + 8}" y="${y + 4}" text-anchor="${flip ? 'end' : 'start'}" font-size="11" style="fill:var(--text)">${r.name.replace('Faculty of ', '')}</text>`;
+      }
+    });
+    const ux = X(uLng), uy = Y(uLat);
+    out += `<circle cx="${ux}" cy="${uy}" r="11" style="fill:var(--accent-2);opacity:.25"/><circle cx="${ux}" cy="${uy}" r="5" style="fill:var(--accent-2)"/>`;
+    svg.innerHTML = out;
+    svg.classList.add('on');
+  }
+
+  function render(userLat, userLng, sourceLabel) {
+    const status = document.getElementById('status');
+    status.classList.remove('err');
+    status.textContent = sourceLabel;
+
+    const results = faculties
+      .map(f => ({
+        ...f,
+        distance: haversine(userLat, userLng, f.lat, f.lng),
+        bearing: bearing(userLat, userLng, f.lat, f.lng)
+      }))
+      .sort((a, b) => a.distance - b.distance);
+
+    drawMap(userLat, userLng, results);
+    const list = document.getElementById('list');
+    list.innerHTML = results.map((f, i) => `
+      <div class="card ${i === 0 ? 'nearest' : ''}">
+        <div class="arrow" style="transform: rotate(${f.bearing}deg)">&#8593;</div>
+        <div class="meta">
+          <p class="name">${f.name}</p>
+          <p class="dist">${fmtDistance(f.distance)} &middot; ${compass(f.bearing)} &middot; ${f.category}</p>
+        </div>
+        ${i === 0 ? '<span class="tag">Nearest</span>' : ''}
+      </div>
+    `).join('');
+  }
+
+  document.getElementById('use-location').addEventListener('click', () => {
+    const status = document.getElementById('status');
+    status.textContent = "Getting your location...";
+    status.classList.remove('err');
+    if (!navigator.geolocation) {
+      status.textContent = "Geolocation isn't available in this browser.";
+      status.classList.add('err');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      pos => render(pos.coords.latitude, pos.coords.longitude, "Using your real GPS position."),
+      err => {
+        status.textContent = "Couldn't get your location (" + err.message + "). Try the simulate button.";
+        status.classList.add('err');
+      }
+    );
+  });
+
+  document.getElementById('simulate').addEventListener('click', () => {
+    render(7.5185, 4.5280, "Using a simulated test point near Faculty of Technology.");
+  });
+</script>
+</body>
+</html>
