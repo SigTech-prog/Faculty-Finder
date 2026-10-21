@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#103d31">
+<title>Faculty Finder — OAU Campus Guide</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  :root {
+    --green: #103d31; --green-dark: #0a2b23; --green-soft: #e8f1eb; --lime: #d8f08a;
+    --paper: #f6f7f2; --white: #fff; --ink: #17231d; --muted: #68746d; --line: #e5eae3;
+    --blue: #1a73e8;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; color: var(--ink); background: var(--paper);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif; }
+  button, input { font: inherit; }
+  button { cursor: pointer; }
+
+  .topbar { padding: 14px 5vw; padding-top: calc(14px + env(safe-area-inset-top, 0px));
+    background: var(--green); color: #fff; display: flex; align-items: center; }
+  .brand { display: flex; align-items: center; gap: 12px; font-weight: 750; letter-spacing: -.02em; }
+  .brand-mark { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 12px;
+    background: var(--lime); color: var(--green-dark); font-weight: 900; }
+  .brand small { display: block; margin-top: 2px; color: #c6d8ce; font-size: 11px; font-weight: 500;
+    letter-spacing: .08em; text-transform: uppercase; }
+
+  main { width: min(1200px, 100%); margin: 0 auto; padding: 22px 5vw 40px; }
+  h1 { margin: 0 0 6px; font-size: clamp(26px, 4vw, 38px); letter-spacing: -.04em; line-height: 1.1; }
+  .lede { margin: 0 0 18px; color: var(--muted); line-height: 1.5; max-width: 620px; }
+
+  .workspace { display: grid; grid-template-columns: 340px minmax(0, 1fr); overflow: hidden;
+    border: 1px solid var(--line); border-radius: 20px; background: #fff;
+    box-shadow: 0 14px 40px rgba(18, 42, 31, .11); }
+  .sidebar { padding: 18px; border-right: 1px solid var(--line); min-width: 0; }
+  .mapcol { padding: 14px; min-width: 0; }
+  .chips, .toolbar, .panel, .howto { max-width: 100%; }
+
+  .search { width: 100%; height: 46px; padding: 0 14px; border: 1px solid #dfe6df; border-radius: 12px;
+    outline: none; background: #fbfcfa; margin-bottom: 10px; }
+  .search:focus { border-color: #62977c; box-shadow: 0 0 0 3px rgba(98,151,124,.14); }
+  .chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; }
+  .chip { white-space: nowrap; font-size: 12.5px; padding: 6px 12px; border-radius: 999px;
+    border: 1px solid var(--line); background: #fff; color: var(--ink); }
+  .chip.on { background: var(--green); color: #fff; border-color: var(--green); }
+  .listhead { display: flex; justify-content: space-between; align-items: center; margin: 12px 0 8px; }
+  .listhead h2 { margin: 0; font-size: 14px; }
+  .count { color: var(--muted); font-size: 12px; }
+  .list { display: grid; gap: 6px; max-height: 520px; overflow-y: auto; }
+  .place { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px; text-align: left;
+    border: 1px solid transparent; border-radius: 13px; background: #fff; color: var(--ink); }
+  .place:hover { background: #f9fbf8; border-color: #dce7dc; }
+  .place.sel { border-color: #9dbba6; background: var(--green-soft); }
+  .pi { width: 36px; height: 36px; flex: none; display: grid; place-items: center; border-radius: 11px;
+    background: #eff4ed; color: var(--green); font-weight: 800; }
+  .place strong { display: block; font-size: 13px; }
+  .place em { display: block; margin-top: 3px; color: var(--muted); font-size: 11.5px; font-style: normal; }
+  .none { padding: 16px 8px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+  .btn { padding: 9px 13px; border-radius: 10px; border: 1px solid var(--line); background: #fff;
+    color: var(--ink); font-size: 13.5px; font-weight: 600; }
+  .btn.primary { background: var(--green); color: #fff; border-color: var(--green); }
+  .btn.route { background: var(--blue); color: #fff; border-color: var(--blue); }
+  .btn.on { background: var(--lime); border-color: #b9d466; }
+  .btn:disabled { opacity: .55; cursor: not-allowed; }
+  .status { min-height: 20px; font-size: 13px; color: var(--green); margin-bottom: 8px; }
+  .status.err { color: #b3402a; }
+
+  #map { height: 55vh; min-height: 340px; border-radius: 14px; border: 1px solid var(--line); background: #e4e0d2; }
+  #map.picking { cursor: crosshair; }
+  .leaflet-tooltip.lbl { background: transparent; border: none; box-shadow: none; padding: 0;
+    color: #16263D; font-weight: 600; font-size: 11px;
+    text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff, 0 0 4px #fff; }
+  .leaflet-tooltip.lbl::before { display: none; }
+  #map.hide-labels .lbl { display: none; }
+
+  .panel { margin-top: 10px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--green-soft); }
+  .panel strong { display: block; font-size: 16px; }
+  .panel span { display: block; margin-top: 4px; color: var(--muted); font-size: 13px; line-height: 1.45; }
+  .panel .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  a.btn { text-decoration: none; display: inline-block; }
+
+  .howto { margin: 12px 0 0; padding: 12px 14px; border-radius: 12px; background: #fbfcfa; border: 1px dashed #cfd9cf;
+    font-size: 13px; color: var(--muted); line-height: 1.55; }
+  .howto b { color: var(--ink); }
+  .safety { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
+
+  @media (max-width: 850px) {
+    .workspace { grid-template-columns: minmax(0, 1fr); }
+    .mapcol { order: 1; }
+    .sidebar { order: 2; border-right: none; border-top: 1px solid var(--line); }
+    .list { max-height: none; }
+  }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="brand-mark">FF</span><div>Faculty Finder<small>OAU Campus Guide</small></div></div>
+</header>
+
+<main>
+  <h1>Find your way around OAU</h1>
+  <p class="lede">Search for a faculty, department or landmark, then preview the walking route from where you are.</p>
+
+  <div class="workspace">
+    <section class="mapcol">
+      <div class="toolbar">
+        <button class="btn primary" id="locate">&#9678; Use my location</button>
+        <button class="btn" id="demo">Try demo location</button>
+        <button class="btn" id="pick">Pick start on map</button>
+        <button class="btn" id="clear" hidden>Clear route</button>
+      </div>
+      <div class="status" id="status" aria-live="polite"></div>
+
+      <div id="map"></div>
+
+      <div class="panel" id="panel" hidden>
+        <strong id="p-name">Destination</strong>
+        <span id="p-sub"></span>
+        <div class="actions">
+          <button class="btn route" id="preview">Preview walking route</button>
+          <a class="btn" id="gmaps" target="_blank" rel="noopener">Open in Google Maps</a>
+          <button class="btn" disabled title="Not built yet">AR view &middot; coming soon</button>
+        </div>
+      </div>
+
+      <div class="howto">
+        <b>How to use:</b> 1) Set your start: <b>Use my location</b>, <b>Try demo location</b> (pretend you're near Technology),
+        or <b>Pick start on map</b> then tap the map. 2) Choose a place from the map or the list.
+        3) Tap <b>Preview walking route</b>.
+      </div>
+      <p class="safety">Routes and times are estimates. Follow paths and signs, and stay aware of your surroundings.</p>
+    </section>
+
+    <aside class="sidebar">
+      <input class="search" id="search" type="search" placeholder="Find a faculty, department, or landmark">
+      <div class="chips" id="chips"></div>
+      <div class="listhead"><h2>Places</h2><span class="count" id="count"></span></div>
+      <div class="list" id="list"></div>
+    </aside>
+  </div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+  const places = [
+    { name: "Faculty of Technology", category: "Faculty", lat: 7.51786, lng: 4.52831 },
+    { name: "Student Union", category: "Student Services", lat: 7.517954, lng: 4.520764 },
+    { name: "First Bank", category: "Bank", lat: 7.521584, lng: 4.523843 },
+    { name: "Faculty of Agriculture", category: "Faculty", lat: 7.522503, lng: 4.525837 },
+    { name: "Faculty of Environmental Design and Management", category: "Faculty", lat: 7.524602, lng: 4.527134 },
+    { name: "New Geology", category: "Academic Building", lat: 7.520734, lng: 4.520195 },
+    { name: "Museum", category: "Museum", lat: 7.516756, lng: 4.528173 },
+    { name: "Ajose", category: "Campus Landmark", lat: 7.521812, lng: 4.526732 },
+    { name: "Spider Building", category: "Campus Landmark", lat: 7.523554, lng: 4.529412 },
+    { name: "Maintenance", category: "Campus Facility", lat: 7.522040, lng: 4.528237 },
+    { name: "Humanities", category: "Academic Area", lat: 7.519955, lng: 4.524689 },
+    { name: "BOOA and BOOC", category: "Academic Buildings", lat: 7.518736, lng: 4.524977 },
+    { name: "Botany", category: "Department or Building", lat: 7.519485, lng: 4.526105 },
+    { name: "Central Laboratory", category: "Laboratory", lat: 7.518204, lng: 4.524019 },
+    { name: "Anatomy", category: "Department or Building", lat: 7.519004, lng: 4.526395 },
+    { name: "Computer Building", category: "Academic Building", lat: 7.518055, lng: 4.529530 },
+    { name: "INTECU Building", category: "Campus Facility", lat: 7.517402, lng: 4.528500 },
+    { name: "Yellow House", category: "Campus Landmark", lat: 7.519279, lng: 4.519986 },
+    { name: "White House Extension", category: "Campus Landmark", lat: 7.520119, lng: 4.520072 },
+    { name: "Faculty of Administration", category: "Faculty", lat: 7.520031, lng: 4.522010 },
+  ];
+
+  const $ = id => document.getElementById(id);
+  const toRad = d => d * Math.PI / 180;
+  function haversine(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+  const fmt = m => m < 1000 ? Math.round(m) + ' m' : (m/1000).toFixed(2) + ' km';
+  function setStatus(msg, isErr) {
+    $('status').textContent = msg || '';
+    $('status').classList.toggle('err', !!isErr);
+  }
+
+  // ---- State ----
+  let activeCat = 'All', query = '', selected = null, user = null;
+  let userMarker = null, watchId = null, routeLine = null, pickMode = false;
+
+  // ---- Map ----
+  const mapEl = $('map');
+  const map = L.map('map');
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+  const campusBounds = L.latLngBounds(places.map(p => [p.lat, p.lng]));
+  map.fitBounds(campusBounds, { padding: [24, 24] });
+
+  function labelFor(name) {
+    return name
+      .replace('Faculty of Environmental Design and Management', 'Env. Design & Mgmt')
+      .replace('Faculty of ', 'Fac. of ');
+  }
+  function updateLabels() { mapEl.classList.toggle('hide-labels', map.getZoom() < 15); }
+  map.on('zoomend', updateLabels);
+  updateLabels();
+
+  const BASE = { radius: 9, weight: 3, color: '#ffffff', fillColor: '#C9871A', fillOpacity: 1 };
+  const SEL  = { radius: 12, weight: 3, color: '#ffffff', fillColor: '#103d31', fillOpacity: 1 };
+  const layer = L.layerGroup().addTo(map);
+  const markers = new Map();
+  places.forEach(p => {
+    const m = L.circleMarker([p.lat, p.lng], BASE);
+    m.bindTooltip(labelFor(p.name), { permanent: true, direction: 'right', offset: [8, 0], className: 'lbl' });
+    m.on('click', () => { if (!pickMode) selectPlace(p.name, false); });
+    markers.set(p.name, m);
+  });
+
+  // ---- List, search, filters ----
+  const categories = ['All', ...new Set(places.map(p => p.category))];
+  $('chips').innerHTML = categories.map(c => `<button class="chip ${c === 'All' ? 'on' : ''}" data-cat="${c}">${c}</button>`).join('');
+  $('chips').addEventListener('click', e => {
+    const b = e.target.closest('.chip');
+    if (!b) return;
+    activeCat = b.dataset.cat;
+    $('chips').querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b));
+    refreshList();
+  });
+  $('search').addEventListener('input', e => { query = e.target.value.trim().toLowerCase(); refreshList(); });
+
+  function refreshList() {
+    const vis = places
+      .filter(p => (activeCat === 'All' || p.category === activeCat) && (p.name + ' ' + p.category).toLowerCase().includes(query))
+      .map(p => ({ ...p, d: user ? haversine(user.lat, user.lng, p.lat, p.lng) : null }));
+    vis.sort((a, b) => user ? a.d - b.d : a.name.localeCompare(b.name));
+
+    layer.clearLayers();
+    vis.forEach(p => layer.addLayer(markers.get(p.name)));
+    markers.forEach((m, name) => m.setStyle(selected && selected.name === name ? SEL : BASE));
+
+    $('count').textContent = vis.length + (vis.length === 1 ? ' place' : ' places');
+    $('list').innerHTML = vis.length
+      ? vis.map(p => `
+        <button class="place ${selected && selected.name === p.name ? 'sel' : ''}" data-name="${p.name}">
+          <span class="pi">${p.name.replace('Faculty of ', '').charAt(0)}</span>
+          <span><strong>${p.name}</strong><em>${p.category}${user ? ' &middot; ' + fmt(p.d) : ''}</em></span>
+        </button>`).join('')
+      : '<div class="none">No matching places. Try a faculty name, "bank" or "lab".</div>';
+  }
+  $('list').addEventListener('click', e => {
+    const b = e.target.closest('.place');
+    if (b) selectPlace(b.dataset.name, true);
+  });
+
+  // ---- Selection and destination panel ----
+  function updatePanel() {
+    if (!selected) { $('panel').hidden = true; return; }
+    $('panel').hidden = false;
+    $('p-name').textContent = selected.name;
+    let sub = selected.category;
+    if (user) {
+      const m = haversine(user.lat, user.lng, selected.lat, selected.lng);
+      sub += ' \u00b7 ' + fmt(m) + ' straight-line \u00b7 ~' + fmt(m * 1.3) + ' walking (est.)';
+    } else {
+      sub += ' \u00b7 Set a start point to see distance and routes';
+    }
+    $('p-sub').textContent = sub;
+    $('gmaps').href = 'https://www.google.com/maps/dir/?api=1&destination=' + selected.lat + ',' + selected.lng + '&travelmode=walking';
+  }
+
+  function selectPlace(name, fromList) {
+    selected = places.find(p => p.name === name);
+    if (!selected) return;
+    clearRoute(true);
+    updatePanel();
+    refreshList();
+    if (fromList) mapEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    map.flyTo([selected.lat, selected.lng], Math.max(map.getZoom(), 17));
+    setStatus('Selected ' + selected.name + '. Tap "Preview walking route" to see the way.');
+  }
+
+  // ---- Location ----
+  function setUser(lat, lng, pan, msg) {
+    user = { lat, lng };
+    if (!userMarker) {
+      userMarker = L.circleMarker([lat, lng], { radius: 10, weight: 3, color: '#fff', fillColor: '#2E7D5B', fillOpacity: 1 })
+        .addTo(map).bindTooltip('You are here');
+    } else {
+      userMarker.setLatLng([lat, lng]);
+    }
+    const nearest = Math.min(...places.map(p => haversine(lat, lng, p.lat, p.lng)));
+    if (nearest > 3000) {
+      setStatus("You're about " + fmt(nearest) + " from the nearest campus place, so the map stays on campus. Try the demo location to see how it works.", true);
+    } else {
+      if (msg) setStatus(msg);
+      if (pan) map.flyTo([lat, lng], 17);
+    }
+    updatePanel();
+    refreshList();
+  }
+
+  $('locate').addEventListener('click', () => {
+    if (!navigator.geolocation) {
+      setStatus("Location isn't available here. Use Try demo location or Pick start on map.", true);
+      return;
+    }
+    setStatus('Getting your location...');
+    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+    let first = true;
+    watchId = navigator.geolocation.watchPosition(
+      pos => { setUser(pos.coords.latitude, pos.coords.longitude, first, first ? 'Location found.' : null); first = false; },
+      err => setStatus(err.code === 1
+        ? 'Location is blocked. You can still use Try demo location or Pick start on map.'
+        : "Couldn't get your location (" + err.message + ").", true),
+      { enableHighAccuracy: true }
+    );
+  });
+
+  $('demo').addEventListener('click', () => {
+    if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+    setUser(7.5185, 4.5280, true, "Demo location: pretending you're near the Faculty of Technology.");
+  });
+
+  function setPick(on) {
+    pickMode = on;
+    mapEl.classList.toggle('picking', on);
+    $('pick').classList.toggle('on', on);
+  }
+  $('pick').addEventListener('click', () => {
+    setPick(!pickMode);
+    setStatus(pickMode ? 'Tap the map where you are.' : '');
+  });
+  map.on('click', e => {
+    if (!pickMode) return;
+    setPick(false);
+    if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+    setUser(e.latlng.lat, e.latlng.lng, false, 'Start point set where you tapped.');
+  });
+
+  // ---- Routes ----
+  function clearRoute(silent) {
+    if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+    $('clear').hidden = true;
+    if (!silent) setStatus('Route cleared.');
+  }
+  $('clear').addEventListener('click', () => {
+    clearRoute(false);
+    if (selected) map.flyTo([selected.lat, selected.lng], 17);
+  });
+
+  $('preview').addEventListener('click', async () => {
+    if (!selected) { setStatus('Pick a place first.', true); return; }
+    if (!user) { setStatus('Set a start point first: Use my location, Try demo location, or Pick start on map.', true); return; }
+    clearRoute(true);
+    $('preview').disabled = true;
+    setStatus('Finding walking route...');
+    const url = 'https://routing.openstreetmap.de/routed-foot/route/v1/foot/' +
+      user.lng + ',' + user.lat + ';' + selected.lng + ',' + selected.lat +
+      '?overview=full&geometries=geojson';
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.code !== 'Ok') throw new Error(data.code);
+      const r = data.routes[0];
+      routeLine = L.geoJSON(r.geometry, { style: { color: '#1a73e8', weight: 5, opacity: 0.9 } }).addTo(map);
+      map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
+      setStatus('Directions active: ' + fmt(r.distance) + ', about ' + Math.max(1, Math.round(r.duration / 60)) + ' min on foot to ' + selected.name + '.');
+    } catch (err) {
+      routeLine = L.polyline([[user.lat, user.lng], [selected.lat, selected.lng]],
+        { color: '#1a73e8', weight: 4, dashArray: '8 8' }).addTo(map);
+      map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
+      setStatus("Couldn't load a walking route, so the dashed line is just a straight line, not a real path.", true);
+    } finally {
+      $('preview').disabled = false;
+      $('clear').hidden = false;
+    }
+  });
+
+  refreshList();
+</script>
+</body>
+</html>
