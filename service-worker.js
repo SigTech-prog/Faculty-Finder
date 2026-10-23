@@ -1,7 +1,7 @@
 /* Faculty Finder PWA service worker.
    Only the app shell and static library assets are cached. Map tiles and routing
    responses remain network-only to avoid stale directions and excessive storage. */
-const CACHE_NAME = "faculty-finder-shell-v1";
+const CACHE_NAME = "faculty-finder-shell-v2";
 const APP_ROOT = new URL("./", self.registration.scope).href;
 const INDEX_URL = new URL("index.html", APP_ROOT).href;
 const APP_SHELL = [
@@ -13,7 +13,10 @@ const APP_SHELL = [
 const STATIC_ASSETS = [
   "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css",
   "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js",
-  "https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"
+  "https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js",
+  "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css",
+  "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
+  "https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"
 ];
 
 self.addEventListener("install", event => {
@@ -76,7 +79,9 @@ self.addEventListener("fetch", event => {
           cache.put(request, response.clone()).catch(() => {});
         }
         return response;
-      } catch {
+      } catch (error) {
+        // Let the browser's script/link onerror handlers try the alternate CDN.
+        if (isStaticLibrary) throw error;
         return new Response("", { status: 504, statusText: "Offline" });
       }
     })());
