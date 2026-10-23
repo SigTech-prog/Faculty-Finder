@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#103d31">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%A7%AD%3C/text%3E%3C/svg%3E">
+<title>Faculty Finder — OAU Campus Guide</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  :root {
+    --green: #103d31; --green-dark: #0a2b23; --green-soft: #e8f1eb; --lime: #d8f08a;
+    --paper: #f6f7f2; --white: #fff; --ink: #17231d; --muted: #68746d; --line: #e5eae3;
+    --blue: #1a73e8;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; color: var(--ink); background: var(--paper);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif; }
+  button, input, select { font: inherit; }
+  :focus-visible { outline: 3px solid #1a73e8; outline-offset: 2px; }
+  button { cursor: pointer; }
+
+  .topbar { padding: 14px 5vw; padding-top: calc(14px + env(safe-area-inset-top, 0px));
+    background: var(--green); color: #fff; display: flex; align-items: center; }
+  .brand { display: flex; align-items: center; gap: 12px; font-weight: 750; letter-spacing: -.02em; }
+  .brand-mark { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 12px;
+    background: var(--lime); color: var(--green-dark); font-weight: 900; }
+  .brand small { display: block; margin-top: 2px; color: #c6d8ce; font-size: 11px; font-weight: 500;
+    letter-spacing: .08em; text-transform: uppercase; }
+
+  main { width: min(1200px, 100%); margin: 0 auto; padding: 22px 5vw 40px; }
+  h1 { margin: 0 0 6px; font-size: clamp(26px, 4vw, 38px); letter-spacing: -.04em; line-height: 1.1; }
+  .lede { margin: 0 0 18px; color: var(--muted); line-height: 1.5; max-width: 620px; }
+
+  .workspace { display: grid; grid-template-columns: minmax(0, 1fr) 340px; overflow: hidden;
+    border: 1px solid var(--line); border-radius: 20px; background: #fff;
+    box-shadow: 0 14px 40px rgba(18, 42, 31, .11); }
+  .sidebar { padding: 18px; border-left: 1px solid var(--line); min-width: 0; }
+  .mapcol { padding: 14px; min-width: 0; }
+  .chips, .toolbar, .panel, .howto { max-width: 100%; }
+
+  .search { width: 100%; height: 46px; padding: 0 14px; border: 1px solid #dfe6df; border-radius: 12px;
+    outline: none; background: #fbfcfa; margin-bottom: 10px; }
+  .search:focus { border-color: #62977c; box-shadow: 0 0 0 3px rgba(98,151,124,.14); }
+  .chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; }
+  .chip { white-space: nowrap; font-size: 12.5px; padding: 6px 12px; border-radius: 999px;
+    border: 1px solid var(--line); background: #fff; color: var(--ink); }
+  .chip.on { background: var(--green); color: #fff; border-color: var(--green); }
+  .listhead { display: flex; justify-content: space-between; align-items: center; margin: 12px 0 8px; }
+  .listhead h2 { margin: 0; font-size: 14px; }
+  .count { color: var(--muted); font-size: 12px; }
+  .list { display: grid; gap: 6px; max-height: 520px; overflow-y: auto; }
+  .place { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px; text-align: left;
+    border: 1px solid transparent; border-radius: 13px; background: #fff; color: var(--ink); }
+  .place:hover { background: #f9fbf8; border-color: #dce7dc; }
+  .place.sel { border-color: #9dbba6; background: var(--green-soft); }
+  .pi { width: 36px; height: 36px; flex: none; display: grid; place-items: center; border-radius: 11px;
+    background: #eff4ed; color: var(--green); font-weight: 800; }
+  .place strong { display: block; font-size: 13px; }
+  .place em { display: block; margin-top: 3px; color: var(--muted); font-size: 11.5px; font-style: normal; }
+  .none { padding: 16px 8px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+  .btn { padding: 9px 13px; border-radius: 10px; border: 1px solid var(--line); background: #fff;
+    color: var(--ink); font-size: 13.5px; font-weight: 600; }
+  .btn.primary { background: var(--green); color: #fff; border-color: var(--green); }
+  .btn.route { background: var(--blue); color: #fff; border-color: var(--blue); }
+  .btn.on { background: var(--lime); border-color: #b9d466; }
+  .btn:disabled { opacity: .55; cursor: not-allowed; }
+  .status { min-height: 20px; font-size: 13px; color: var(--green); margin-bottom: 8px; }
+  .status.err { color: #b3402a; }
+
+  #map { height: 55vh; min-height: 340px; border-radius: 14px; border: 1px solid var(--line); background: #e4e0d2; }
+  #map.picking { cursor: crosshair; }
+  .leaflet-tooltip.lbl { background: transparent; border: none; box-shadow: none; padding: 0;
+    color: #16263D; font-weight: 600; font-size: 11px;
+    text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff, 0 0 4px #fff; }
+  .leaflet-tooltip.lbl::before { display: none; }
+  #map.hide-labels .lbl { display: none; }
+  .compass { width: 46px; height: 46px; border-radius: 50%; background: #fff; border: 1px solid rgba(0,0,0,.15);
+    box-shadow: 0 1px 5px rgba(0,0,0,.45); cursor: pointer; position: relative; margin-top: 10px; }
+  .compass .needle { position: absolute; inset: 0; transition: transform .1s linear; }
+  .compass .n { position: absolute; top: 3px; left: 0; right: 0; text-align: center; font-size: 10px;
+    font-weight: 800; color: #b3402a; line-height: 1; }
+  .compass .arrow { position: absolute; left: 50%; top: 15px; margin-left: -5px; width: 0; height: 0;
+    border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 14px solid #b3402a; }
+  .compass .arrow::after { content: ''; position: absolute; left: -5px; top: 14px; width: 0; height: 0;
+    border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 11px solid #17231d; }
+
+  .panel { margin-top: 10px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--green-soft); }
+  .panel strong { display: block; font-size: 16px; }
+  .panel span { display: block; margin-top: 4px; color: var(--muted); font-size: 13px; line-height: 1.45; }
+  .panel .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  a.btn { text-decoration: none; display: inline-block; }
+  .warn { margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: #fff4d6; color: #7a5200; font-size: 12.5px; line-height: 1.4; }
+  .toolbar select.btn { max-width: 100%; min-width: 0; }
+
+  .howto { margin: 12px 0 0; padding: 12px 14px; border-radius: 12px; background: #fbfcfa; border: 1px dashed #cfd9cf;
+    font-size: 13px; color: var(--muted); line-height: 1.55; }
+  .howto b { color: var(--ink); }
+  .safety { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
+
+  .finder { position: relative; margin-bottom: 16px; max-width: 720px; }
+  .finder .search { height: 54px; font-size: 16px; padding: 0 18px; margin-bottom: 0;
+    border: 2px solid #9dbba6; background: #fff; box-shadow: 0 8px 24px rgba(18, 42, 31, .08); }
+  .suggest { position: absolute; left: 0; right: 0; top: 60px; z-index: 2000; background: #fff;
+    border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 14px 40px rgba(18, 42, 31, .18);
+    max-height: 340px; overflow-y: auto; }
+  .sug { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 12px; text-align: left;
+    border: none; border-bottom: 1px solid var(--line); background: #fff; color: var(--ink); }
+  .sug:last-child { border-bottom: none; }
+  .sug:hover { background: var(--green-soft); }
+  .sug strong { display: block; font-size: 14px; }
+  .sug em { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; font-style: normal; }
+
+  @media (max-width: 850px) {
+    .workspace { grid-template-columns: minmax(0, 1fr); }
+    .mapcol { order: 1; }
+    .sidebar { order: 2; border-left: none; border-top: 1px solid var(--line); }
+    .list { max-height: none; }
+  }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="brand-mark">FF</span><div>Faculty Finder<small>OAU Campus Guide</small></div></div>
+</header>
+
+<main>
+  <h1>Find your way around OAU</h1>
+  <p class="lede">Search for a faculty, department or landmark, then preview the walking route from where you are.</p>
+
+  <div class="finder">
+    <input class="search" id="search" type="search" autocomplete="off" aria-label="Search for a place" placeholder="Where are you going? e.g. Faculty of Technology, bank, museum">
+    <div class="suggest" id="suggest" hidden></div>
+  </div>
+
+  <div class="workspace">
+    <section class="mapcol">
+      <div class="toolbar">
+        <button class="btn primary" id="locate">&#9678; Use my location</button>
+        <button class="btn" id="demo">Try demo location</button>
+        <button class="btn" id="pick">Pick start on map</button>
+        <button class="btn" id="heading">Rotate map with your phone</button>
+        <button class="btn" id="stopTrack" hidden>Stop tracking</button>
+        <select class="btn" id="startFrom" aria-label="Start from a landmark"><option value="">Start from a landmark&hellip;</option></select>
+        <button class="btn" id="clear" hidden>Clear route</button>
+      </div>
+      <div class="status" id="status" aria-live="polite"></div>
+
+      <div id="map"></div>
+
+      <div class="panel" id="panel" hidden>
+        <strong id="p-name">Destination</strong>
+        <span id="p-sub"></span>
+        <div class="warn" id="p-warn" hidden>Approximate pin: this location has not been verified yet, so it may be off by a building or more.</div>
+        <div class="actions">
+          <button class="btn route" id="preview">Preview walking route</button>
+          <a class="btn" id="gmaps" target="_blank" rel="noopener" title="Opens Google Maps in a new tab with walking directions">Walking directions in Google Maps &#8599;</a>
+          <button class="btn" id="share">Copy link</button>
+          <a class="btn" id="report" target="_blank" rel="noopener">Report a wrong pin</a>
+          <button class="btn" disabled title="Not built yet">AR view &middot; coming soon</button>
+        </div>
+      </div>
+
+      <div class="howto">
+        <b>How to use:</b> 1) Set your start: <b>Use my location</b>, <b>Try demo location</b> (pretend you're near Technology),
+        or <b>Pick start on map</b> then tap the map. 2) Search for your destination above, or pick it from the map or the list.
+        3) Tap <b>Preview walking route</b>. Faded pins are approximate and not yet verified.
+      </div>
+      <p class="safety">Routes and times are estimates. Follow paths and signs, and stay aware of your surroundings. Privacy: your location stays in your browser, except that route requests send your start and destination points to a public OpenStreetMap routing service. Pin data comes from a community survey and hasn't been checked on the ground yet; if a pin looks wrong, tap "Report a wrong pin" on its card.</p>
+      <p class="safety">Credits: place data shared by Tobyy (OAUMods) and a community survey. Map &copy; OpenStreetMap contributors. Built by SigTech-prog.</p>
+    </section>
+
+    <aside class="sidebar">
+      <div class="chips" id="chips"></div>
+      <div class="listhead"><h2>Places</h2><span class="count" id="count" aria-live="polite"></span></div>
+      <div class="list" id="list"></div>
+    </aside>
+  </div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
+<script>
+  const places = [
+    { name: "Faculty of Technology", category: "Faculty", aliases: ["tech", "engineering", "eng"], lat: 7.51786, lng: 4.52831 },
+    { name: "Student Union", category: "Student Services", aliases: ["su", "union", "sub"], lat: 7.517954, lng: 4.520764 },
+    { name: "First Bank", category: "Bank", aliases: ["atm", "bank", "firstbank"], lat: 7.521584, lng: 4.523843 },
+    { name: "Faculty of Agriculture", category: "Faculty", aliases: ["agric", "agr"], lat: 7.522503, lng: 4.525837 },
+    { name: "Faculty of Environmental Design and Management", category: "Faculty", aliases: ["edm", "environmental", "architecture"], lat: 7.524602, lng: 4.527134 },
+    { name: "New Geology", category: "Academic Building", aliases: ["geology", "geo"], lat: 7.520734, lng: 4.520195 },
+    { name: "Museum", category: "Museum", lat: 7.516756, lng: 4.528173 },
+    { name: "Ajose", category: "Campus Landmark", lat: 7.521812, lng: 4.526732 },
+    { name: "Spider Building", category: "Campus Landmark", lat: 7.523554, lng: 4.529412 },
+    { name: "Maintenance", category: "Campus Facility", aliases: ["works"], lat: 7.522040, lng: 4.528237 },
+    { name: "Humanities", category: "Academic Area", lat: 7.519955, lng: 4.524689 },
+    { name: "BOOA and BOOC", category: "Academic Buildings", lat: 7.518736, lng: 4.524977 },
+    { name: "Botany", category: "Department or Building", lat: 7.519485, lng: 4.526105 },
+    { name: "Central Laboratory", category: "Laboratory", aliases: ["lab", "labs", "laboratory"], lat: 7.518204, lng: 4.524019 },
+    { name: "Anatomy", category: "Department or Building", lat: 7.519004, lng: 4.526395 },
+    { name: "Computer Building", category: "Academic Building", lat: 7.518055, lng: 4.529530 },
+    { name: "INTECU Building", category: "Campus Facility", lat: 7.517402, lng: 4.528500 },
+    { name: "Yellow House", category: "Campus Landmark", lat: 7.519279, lng: 4.519986 },
+    { name: "White House Extension", category: "Campus Landmark", lat: 7.520119, lng: 4.520072 },
+    { name: "Faculty of Administration", category: "Faculty", aliases: ["admin", "mgt"], lat: 7.520031, lng: 4.522010 },
+    { name: "Faculty of Science", category: "Faculty", aliases: ["sci"], lat: 7.52063, lng: 4.52122 },
+    { name: "Faculty of Arts", category: "Faculty", lat: 7.52032, lng: 4.5242 },
+    { name: "Faculty of Law", category: "Faculty", lat: 7.52094, lng: 4.52237 },
+    { name: "Faculty of Education", category: "Faculty", aliases: ["edu"], lat: 7.52095, lng: 4.52323 },
+    { name: "Faculty of Social Sciences", category: "Faculty", aliases: ["socsci", "soc sci"], lat: 7.5213, lng: 4.52269 },
+    { name: "Faculty of Pharmacy", category: "Faculty", aliases: ["pharm"], lat: 7.51801, lng: 4.52942 },
+    { name: "Faculty of Basic Medical Sciences", category: "Faculty", aliases: ["bms", "basic med"], approx: true, lat: 7.515, lng: 4.529 },
+    { name: "Faculty of Clinical Sciences", category: "Faculty", aliases: ["clinical"], approx: true, lat: 7.5145, lng: 4.53 },
+    { name: "Faculty of Dentistry", category: "Faculty", aliases: ["dent"], approx: true, lat: 7.514, lng: 4.531 },
+    { name: "Computing Science and Engineering", category: "Faculty", aliases: ["csc", "cs", "comp sci", "computer science", "computing"], lat: 7.5178, lng: 4.5286 },
+    { name: "Nursing Science", category: "Faculty", aliases: ["nursing"], approx: true, lat: 7.5155, lng: 4.5305 },
+    { name: "Alumni Hall", category: "Hostel", aliases: ["alumni"], lat: 7.52183, lng: 4.51745 },
+    { name: "Angola Hall", category: "Hostel", lat: 7.52152, lng: 4.51323 },
+    { name: "Awolowo Hall", category: "Hostel", lat: 7.52074, lng: 4.51518 },
+    { name: "Civil Engineering Building", category: "Academic Building", lat: 7.52308, lng: 4.52906 },
+    { name: "Chemical Engineering Building", category: "Academic Building", lat: 7.51924, lng: 4.52830 },
+    { name: "Health Centre", category: "Health", aliases: ["clinic", "medical centre"], lat: 7.52023, lng: 4.51670 },
+    { name: "Moremi Hall", category: "Hostel", lat: 7.52041, lng: 4.51834 },
+    { name: "New Bukateria", category: "Food", aliases: ["bukateria", "buka", "food", "eatery"], approx: true, lat: 7.51812, lng: 4.51484 },
+    { name: "ETF Hall", category: "Academic Building", approx: true, lat: 7.51812, lng: 4.51484 },
+    { name: "1000 Seater Lecture Theatre", category: "Academic Building", aliases: ["1000", "lt", "lecture theatre"], approx: true, lat: 7.52000, lng: 4.52700 },
+    { name: "Hezekiah Oluwasanmi Library", category: "Library", aliases: ["library", "lib"], approx: true, lat: 7.52000, lng: 4.52700 },
+    { name: "Oduduwa Hall", category: "Campus Landmark", aliases: ["oduduwa"], approx: true, lat: 7.51800, lng: 4.52600 },
+    { name: "Adekunle Fajuyi Hall", category: "Hostel", approx: true, lat: 7.52100, lng: 4.53000 },
+    { name: "Ladoke Akintola Hall", category: "Hostel", approx: true, lat: 7.51900, lng: 4.51500 },
+    { name: "Murtala Muhammed Postgraduate Hall", category: "Hostel", aliases: ["pg", "postgraduate"], approx: true, lat: 7.52400, lng: 4.51900 },
+    { name: "University Hall", category: "Campus Landmark", approx: true, lat: 7.52000, lng: 4.51900 },
+    { name: "African Amphitheatre", category: "Campus Landmark", aliases: ["amphitheatre", "amphitheater", "amphi"], approx: true, lat: 7.51900, lng: 4.52900 },
+    { name: "Main University Gate", category: "Campus Landmark", aliases: ["gate", "main gate", "entrance"], lat: 7.51830, lng: 4.52280 },
+    { name: "Motion Ground", category: "Sports", aliases: ["motion", "ground"], approx: true, lat: 7.52000, lng: 4.52700 },
+    { name: "University Sports Centre", category: "Sports", aliases: ["sports", "sport", "gym"], approx: true, lat: 7.51600, lng: 4.52100 },
+    { name: "Post Office", category: "Campus Facility", aliases: ["post", "mail"], approx: true, lat: 7.52100, lng: 4.52600 },
+    { name: "Senate Building", category: "Campus Facility", aliases: ["senate"], approx: true, lat: 7.52000, lng: 4.52500 },
+    { name: "Architecture Building", category: "Academic Building", approx: true, lat: 7.52000, lng: 4.52300 },
+    { name: "Zoology", category: "Academic Building", approx: true, lat: 7.51900, lng: 4.52800 },
+    { name: "Institute of Ecology and Environmental Studies", category: "Research Centre", aliases: ["ecology", "iees"], approx: true, lat: 7.51900, lng: 4.52600 },
+    { name: "Centre for Gender and Social Policy Studies", category: "Research Centre", aliases: ["gender"], approx: true, lat: 7.52100, lng: 4.52600 },
+    { name: "Centre for Industrial Research and Development", category: "Research Centre", aliases: ["cird"], approx: true, lat: 7.52200, lng: 4.52900 },
+    { name: "Institute of Public Health", category: "Research Centre", aliases: ["iph"], approx: true, lat: 7.51700, lng: 4.52600 },
+  ];
+
+  const $ = id => document.getElementById(id);
+  const toRad = d => d * Math.PI / 180;
+  function haversine(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+  const fmt = m => m < 1000 ? Math.round(m) + ' m' : (m/1000).toFixed(2) + ' km';
+
+  // Search helpers: substring match on name, category and aliases, then a small typo tolerance
+  const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function lev(a, b) {
+    const m = a.length, n = b.length, d = [];
+    for (let i = 0; i <= m; i++) d[i] = [i];
+    for (let j = 1; j <= n; j++) d[0][j] = j;
+    for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++)
+      d[i][j] = Math.min(d[i-1][j] + 1, d[i][j-1] + 1, d[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+    return d[m][n];
+  }
+  function haystack(p) { return (p.name + ' ' + p.category + ' ' + (p.aliases || []).join(' ')).toLowerCase(); }
+  function matchPlace(p, q) {
+    if (!q) return true;
+    const h = haystack(p);
+    if (h.includes(q)) return true;
+    if (q.length < 4) return false;
+    const tol = q.length >= 6 ? 2 : 1;
+    return h.split(/[^a-z0-9]+/).some(t => t.length >= 3 && (lev(t, q) <= tol || lev(t.slice(0, q.length), q) <= tol));
+  }
+  function setStatus(msg, isErr) {
+    $('status').textContent = msg || '';
+    $('status').classList.toggle('err', !!isErr);
+  }
+
+  // ---- State ----
+  let activeCat = 'All', query = '', selected = null, user = null;
+  let userMarker = null, watchId = null, routeLine = null, pickMode = false, routeInfo = null, trackTimer = null;
+
+  // ---- Map ----
+  const mapEl = $('map');
+  const map = L.map('map', { rotate: true, touchRotate: true, bearing: 0, rotateControl: false });
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+  const campusBounds = L.latLngBounds(places.map(p => [p.lat, p.lng]));
+  map.fitBounds(campusBounds, { padding: [24, 24] });
+
+  function labelFor(name) {
+    return name
+      .replace('Faculty of Environmental Design and Management', 'Env. Design & Mgmt')
+      .replace('Faculty of ', 'Fac. of ');
+  }
+  function updateLabels() { mapEl.classList.toggle('hide-labels', map.getZoom() < 15); }
+  map.on('zoomend', updateLabels);
+  updateLabels();
+
+  // Compass: the red arrow always points to true north; tap it to put north back at the top
+  const CompassControl = L.Control.extend({
+    options: { position: 'topright' },
+    onAdd() {
+      const el = L.DomUtil.create('div', 'compass');
+      el.title = 'Compass. Tap to put north at the top';
+      el.innerHTML = '<div class="needle"><span class="n">N</span><span class="arrow"></span></div>';
+      L.DomEvent.disableClickPropagation(el);
+      L.DomEvent.on(el, 'click', () => {
+        if (!map.setBearing) return;
+        stopHeading();
+        map.setBearing(0);
+        setStatus('Map is back to north-up.');
+      });
+      this._needle = el.firstChild;
+      return el;
+    }
+  });
+  const compassCtl = new CompassControl().addTo(map);
+  function updateNeedle() {
+    const b = map.getBearing ? map.getBearing() : 0;
+    compassCtl._needle.style.transform = 'rotate(' + (-b) + 'deg)';
+  }
+  map.on('rotate', updateNeedle);
+  updateNeedle();
+
+  const BASE = { radius: 9, weight: 3, color: '#ffffff', fillColor: '#C9871A', fillOpacity: 1 };
+  const APPROX = { radius: 9, weight: 3, color: '#ffffff', fillColor: '#C9871A', fillOpacity: 0.4 };
+  const SEL  = { radius: 12, weight: 3, color: '#ffffff', fillColor: '#103d31', fillOpacity: 1 };
+  const layer = L.layerGroup().addTo(map);
+  const markers = new Map();
+  const byName = new Map(places.map(p => [p.name, p]));
+  places.forEach(p => {
+    const m = L.circleMarker([p.lat, p.lng], p.approx ? APPROX : BASE);
+    m.bindTooltip(labelFor(p.name), { permanent: true, direction: 'right', offset: [8, 0], className: 'lbl' });
+    m.on('click', () => { if (!pickMode) selectPlace(p.name, false); });
+    markers.set(p.name, m);
+  });
+
+  // ---- List, search, filters ----
+  const categories = ['All', ...new Set(places.map(p => p.category))];
+  $('chips').innerHTML = categories.map(c => `<button class="chip ${c === 'All' ? 'on' : ''}" data-cat="${c}">${c}</button>`).join('');
+  $('chips').addEventListener('click', e => {
+    const b = e.target.closest('.chip');
+    if (!b) return;
+    activeCat = b.dataset.cat;
+    $('chips').querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b));
+    refreshList();
+  });
+  const suggestEl = $('suggest');
+  function matches(q) {
+    q = q.trim().toLowerCase();
+    if (!q) return [];
+    const hits = places.filter(p => matchPlace(p, q));
+    hits.sort((a, b) => {
+      const as = a.name.toLowerCase().startsWith(q) ? 0 : 1;
+      const bs = b.name.toLowerCase().startsWith(q) ? 0 : 1;
+      return as - bs || a.name.localeCompare(b.name);
+    });
+    return hits;
+  }
+  function showSuggest() {
+    const q = $('search').value;
+    if (!q.trim()) { suggestEl.hidden = true; return; }
+    const hits = matches(q).slice(0, 6);
+    suggestEl.innerHTML = hits.length
+      ? hits.map(p => `
+        <button class="sug" data-name="${p.name}">
+          <span class="pi">${p.name.replace('Faculty of ', '').charAt(0)}</span>
+          <span><strong>${p.name}</strong><em>${p.category}</em></span>
+        </button>`).join('')
+      : '<div class="none">No matching places. Try a faculty name, "bank" or "lab".</div>';
+    suggestEl.hidden = false;
+  }
+  function pickResult(name) {
+    suggestEl.hidden = true;
+    $('search').value = name;
+    query = '';
+    refreshList();
+    selectPlace(name, true);
+    $('search').blur();
+  }
+  $('search').addEventListener('input', e => { query = e.target.value.trim().toLowerCase(); refreshList(); showSuggest(); });
+  $('search').addEventListener('focus', showSuggest);
+  $('search').addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const first = matches($('search').value)[0];
+    if (first) pickResult(first.name);
+  });
+  suggestEl.addEventListener('click', e => {
+    const b = e.target.closest('.sug');
+    if (b) pickResult(b.dataset.name);
+  });
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.finder')) suggestEl.hidden = true;
+  });
+  $('search').addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown') { const f = suggestEl.querySelector('.sug'); if (f) { e.preventDefault(); f.focus(); } }
+    else if (e.key === 'Escape') suggestEl.hidden = true;
+  });
+  suggestEl.addEventListener('keydown', e => {
+    const items = [...suggestEl.querySelectorAll('.sug')];
+    const i = items.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown') { e.preventDefault(); (items[i + 1] || items[0]).focus(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); if (i <= 0) $('search').focus(); else items[i - 1].focus(); }
+    else if (e.key === 'Escape') { suggestEl.hidden = true; $('search').focus(); }
+  });
+
+  function refreshList() {
+    const vis = places
+      .filter(p => (activeCat === 'All' || p.category === activeCat) && matchPlace(p, query))
+      .map(p => ({ ...p, d: user ? haversine(user.lat, user.lng, p.lat, p.lng) : null }));
+    vis.sort((a, b) => user ? a.d - b.d : a.name.localeCompare(b.name));
+
+    layer.clearLayers();
+    vis.forEach(p => layer.addLayer(markers.get(p.name)));
+    markers.forEach((m, name) => m.setStyle(selected && selected.name === name ? SEL : (byName.get(name).approx ? APPROX : BASE)));
+
+    $('count').textContent = vis.length + (vis.length === 1 ? ' place' : ' places');
+    $('list').innerHTML = vis.length
+      ? vis.map(p => `
+        <button class="place ${selected && selected.name === p.name ? 'sel' : ''}" data-name="${p.name}">
+          <span class="pi">${p.name.replace('Faculty of ', '').charAt(0)}</span>
+          <span><strong>${p.name}</strong><em>${p.category}${user ? ' &middot; ' + fmt(p.d) : ''}${p.approx ? ' &middot; approx. pin' : ''}</em></span>
+        </button>`).join('')
+      : '<div class="none">No matching places. Try a faculty name, "bank" or "lab".</div>';
+  }
+  $('list').addEventListener('click', e => {
+    const b = e.target.closest('.place');
+    if (b) selectPlace(b.dataset.name, true);
+  });
+
+  function goTo(ll, z) { if (reduceMotion) map.setView(ll, z); else map.flyTo(ll, z); }
+
+  // ---- Selection and destination panel ----
+  function updatePanel() {
+    if (!selected) { $('panel').hidden = true; return; }
+    $('panel').hidden = false;
+    $('p-name').textContent = selected.name;
+    let sub = selected.category;
+    if (user) {
+      const m = haversine(user.lat, user.lng, selected.lat, selected.lng);
+      sub += ' \u00b7 ' + fmt(m) + ' straight-line \u00b7 ' + (routeInfo
+        ? 'route ' + fmt(routeInfo.dist) + ', about ' + routeInfo.min + ' min on foot'
+        : '~' + fmt(m * 1.3) + ' walking (est.)');
+    } else {
+      sub += ' \u00b7 Set a start point to see distance and routes';
+    }
+    $('p-sub').textContent = sub;
+    $('p-warn').hidden = !selected.approx;
+    $('gmaps').href = 'https://www.google.com/maps/dir/?api=1&destination=' + selected.lat + ',' + selected.lng + '&travelmode=walking';
+    $('report').href = reportUrl(selected);
+  }
+
+  function selectPlace(name, fromList) {
+    selected = places.find(p => p.name === name);
+    if (!selected) return;
+    clearRoute(true);
+    updatePanel();
+    refreshList();
+    if (fromList) mapEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    goTo([selected.lat, selected.lng], Math.max(map.getZoom(), 17));
+    try { history.replaceState(null, '', '?place=' + encodeURIComponent(selected.name)); } catch (e) {}
+    setStatus('Selected ' + selected.name + '. Tap "Preview walking route" to see the way.');
+  }
+
+  // ---- Location ----
+  function setUser(lat, lng, pan, msg, label) {
+    user = { lat, lng };
+    if (!userMarker) {
+      userMarker = L.circleMarker([lat, lng], { radius: 10, weight: 3, color: '#fff', fillColor: '#2E7D5B', fillOpacity: 1 })
+        .addTo(map).bindTooltip(label || 'You are here', { permanent: true, direction: 'top', offset: [0, -10], className: 'lbl' });
+    } else {
+      userMarker.setLatLng([lat, lng]);
+      userMarker.setTooltipContent(label || 'You are here');
+    }
+    const nearest = Math.min(...places.map(p => haversine(lat, lng, p.lat, p.lng)));
+    if (nearest > 3000) {
+      setStatus("You're about " + fmt(nearest) + " from the nearest campus place, so the map stays on campus. Try the demo location to see how it works.", true);
+    } else {
+      if (msg) setStatus(msg);
+      if (pan) goTo([lat, lng], 17);
+    }
+    updatePanel();
+    refreshList();
+  }
+
+  $('locate').addEventListener('click', () => {
+    if (!navigator.geolocation) {
+      setStatus("Location isn't available here. Use Try demo location or Pick start on map.", true);
+      return;
+    }
+    setStatus('Getting your location...');
+    stopWatch();
+    let first = true;
+    watchId = navigator.geolocation.watchPosition(
+      pos => { setUser(pos.coords.latitude, pos.coords.longitude, first, first ? 'Location found.' : null); first = false; },
+      err => setStatus(err.code === 1
+        ? 'Location is blocked. You can still use Try demo location or Pick start on map.'
+        : "Couldn't get your location (" + err.message + ").", true),
+      { enableHighAccuracy: true }
+    );
+    $('stopTrack').hidden = false;
+    trackTimer = setTimeout(() => { stopWatch(); setStatus('Stopped tracking after 10 minutes to protect your battery and privacy.'); }, 600000);
+  });
+
+  $('demo').addEventListener('click', () => {
+    stopWatch();
+    setUser(7.5185, 4.5280, true, "Demo location: pretending you're near the Faculty of Technology.", 'Demo start');
+  });
+
+  function setPick(on) {
+    pickMode = on;
+    mapEl.classList.toggle('picking', on);
+    $('pick').classList.toggle('on', on);
+  }
+  $('pick').addEventListener('click', () => {
+    setPick(!pickMode);
+    setStatus(pickMode ? 'Tap the map where you are.' : '');
+  });
+  map.on('click', e => {
+    if (!pickMode) return;
+    setPick(false);
+    stopWatch();
+    setUser(e.latlng.lat, e.latlng.lng, false, 'Start point set where you tapped.');
+  });
+
+  // Where "Report a wrong pin" goes. To receive reports on WhatsApp instead of GitHub,
+  // put your number here in international format without "+", e.g. '2348012345678'.
+  const REPORT_WHATSAPP = '';
+  function reportUrl(p) {
+    const text = 'Faculty Finder: the pin for "' + p.name + '" (' + p.lat + ', ' + p.lng + ') looks wrong. It should be: ';
+    if (REPORT_WHATSAPP) return 'https://wa.me/' + REPORT_WHATSAPP + '?text=' + encodeURIComponent(text);
+    return 'https://github.com/SigTech-prog/Faculty-Finder/issues/new?title=' + encodeURIComponent('Wrong pin: ' + p.name) + '&body=' + encodeURIComponent(text);
+  }
+
+  // ---- Tracking control, landmark start, share link ----
+  function stopWatch() {
+    if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+    clearTimeout(trackTimer);
+    $('stopTrack').hidden = true;
+  }
+  $('stopTrack').addEventListener('click', () => {
+    stopWatch();
+    setStatus('Stopped tracking your location. Your last position stays on the map.');
+  });
+
+  places.forEach(p => {
+    const o = document.createElement('option');
+    o.value = p.name; o.textContent = p.name;
+    $('startFrom').appendChild(o);
+  });
+  $('startFrom').addEventListener('change', e => {
+    const p = places.find(x => x.name === e.target.value);
+    if (!p) return;
+    stopWatch();
+    setUser(p.lat, p.lng, true, 'Starting from ' + p.name + '.', 'Start: ' + p.name);
+    e.target.value = '';
+  });
+
+  $('share').addEventListener('click', async () => {
+    if (!selected) return;
+    const url = location.href.split('?')[0].split('#')[0] + '?place=' + encodeURIComponent(selected.name);
+    try {
+      if (navigator.share) { await navigator.share({ title: selected.name + ' - Faculty Finder', url }); return; }
+      await navigator.clipboard.writeText(url);
+      setStatus('Link copied. Send it to a friend.');
+    } catch (err) {
+      setStatus('Copy this link: ' + url);
+    }
+  });
+
+  // ---- Rotate map with the phone's compass ----
+  let headingOn = false, lastH = null, lastT = 0;
+  function onOrient(e) {
+    let h = null;
+    if (typeof e.webkitCompassHeading === 'number') h = e.webkitCompassHeading;
+    else if (e.absolute && e.alpha !== null) h = 360 - e.alpha;
+    if (h === null || !map.setBearing) return;
+    const now = Date.now();
+    if (now - lastT < 120) return;
+    if (lastH !== null && Math.abs(h - lastH) < 3) return;
+    lastT = now; lastH = h;
+    map.setBearing(h);
+  }
+  function stopHeading() {
+    window.removeEventListener('deviceorientationabsolute', onOrient, true);
+    window.removeEventListener('deviceorientation', onOrient, true);
+    headingOn = false; lastH = null;
+    $('heading').classList.remove('on');
+  }
+  $('heading').addEventListener('click', async () => {
+    if (!map.setBearing) {
+      setStatus("Map rotation isn't available right now.", true);
+      return;
+    }
+    if (headingOn) {
+      stopHeading();
+      map.setBearing(0);
+      setStatus('Map is back to north-up.');
+      return;
+    }
+    try {
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        const r = await DeviceOrientationEvent.requestPermission();
+        if (r !== 'granted') { setStatus('Compass permission was denied.', true); return; }
+      }
+      window.addEventListener('deviceorientationabsolute', onOrient, true);
+      window.addEventListener('deviceorientation', onOrient, true);
+      headingOn = true;
+      $('heading').classList.add('on');
+      setStatus('The map now turns as you turn. Tap the button again for north-up.');
+    } catch (err) {
+      setStatus("Couldn't start the compass on this device.", true);
+    }
+  });
+
+  // ---- Routes ----
+  function clearRoute(silent) {
+    if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+    routeInfo = null;
+    $('clear').hidden = true;
+    if (!silent) setStatus('Route cleared.');
+  }
+  $('clear').addEventListener('click', () => {
+    clearRoute(false);
+    if (selected) goTo([selected.lat, selected.lng], 17);
+  });
+
+  $('preview').addEventListener('click', async () => {
+    if (!selected) { setStatus('Pick a place first.', true); return; }
+    if (!user) { setStatus('Set a start point first: Use my location, Try demo location, or Pick start on map.', true); return; }
+    clearRoute(true);
+    $('preview').disabled = true;
+    setStatus('Finding walking route...');
+    const url = 'https://routing.openstreetmap.de/routed-foot/route/v1/foot/' +
+      user.lng + ',' + user.lat + ';' + selected.lng + ',' + selected.lat +
+      '?overview=full&geometries=geojson';
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.code !== 'Ok') throw new Error(data.code);
+      const r = data.routes[0];
+      const straight = haversine(user.lat, user.lng, selected.lat, selected.lng);
+      const longRoute = straight > 30 && r.distance > straight * 2.2;
+      const coords = r.geometry.coordinates;
+      const first = coords[0], last = coords[coords.length - 1];
+      const dash = { color: '#1a73e8', weight: 4, dashArray: '6 8', opacity: 0.8 };
+      routeLine = L.featureGroup([L.geoJSON(r.geometry, { style: { color: '#1a73e8', weight: 5, opacity: 0.9 } })]);
+      if (haversine(user.lat, user.lng, first[1], first[0]) > 10) routeLine.addLayer(L.polyline([[user.lat, user.lng], [first[1], first[0]]], dash));
+      if (haversine(selected.lat, selected.lng, last[1], last[0]) > 10) routeLine.addLayer(L.polyline([[last[1], last[0]], [selected.lat, selected.lng]], dash));
+      routeLine.addTo(map);
+      map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
+      routeInfo = { dist: r.distance, min: Math.max(1, Math.round(r.duration / 60)) };
+      updatePanel();
+      setStatus('Directions active: ' + fmt(r.distance) + ', about ' + routeInfo.min + ' min on foot to ' + selected.name + '. Dashed parts are off-path stretches.'
+        + (longRoute ? ' Heads up: this is much longer than the straight line, so it may take a detour. Check "Walking directions in Google Maps" if it looks wrong.' : ''));
+    } catch (err) {
+      routeLine = L.polyline([[user.lat, user.lng], [selected.lat, selected.lng]],
+        { color: '#1a73e8', weight: 4, dashArray: '8 8' }).addTo(map);
+      map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
+      const detour = String(err && err.message).startsWith('detour:');
+      setStatus(detour
+        ? 'The route found was ' + fmt(parseInt(String(err.message).slice(7), 10)) + ', far longer than the straight line, so OpenStreetMap probably lacks paths here. The dashed line is a straight line; use "Walking directions in Google Maps" for a reliable route.'
+        : "Couldn't load a walking route, so the dashed line is just a straight line, not a real path.", !detour);
+    } finally {
+      $('preview').disabled = false;
+      $('clear').hidden = false;
+    }
+  });
+
+  refreshList();
+  const sharedPlace = new URLSearchParams(location.search).get('place');
+  if (sharedPlace) {
+    const hit = places.find(p => p.name.toLowerCase() === sharedPlace.toLowerCase());
+    if (hit) selectPlace(hit.name, false);
+  }
+</script>
+</body>
+</html>
